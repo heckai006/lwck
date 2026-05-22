@@ -1,6 +1,11 @@
+from flask import Flask
+import threading
 import requests
 import time
 from datetime import datetime, date
+
+def monitor_pokemmo():
+    while True:
 
 # -------------------------- 1. 核心配置（关键）--------------------------
 # 直接把Excel里的「图鉴编号→精灵名称」写成字典（替换成你的实际数据）
@@ -760,3 +765,20 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+        pass
+
+app = Flask(__name__)
+
+@app.route('/')
+def keep_alive():
+    return "Alive! 脚本正在运行 ✅"
+
+def run_flask():
+    app.run(host="0.0.0.0", port=8080)
+
+if __name__ == "__main__":
+    # 启动 Flask 服务（后台运行）
+    threading.Thread(target=run_flask, daemon=True).start()
+    # 启动你的监控脚本
+    monitor_pokemmo()
