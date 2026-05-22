@@ -4,9 +4,6 @@ import requests
 import time
 from datetime import datetime, date
 
-def monitor_pokemmo():
-    while True:
-
 # -------------------------- 1. 核心配置（关键）--------------------------
 # 直接把Excel里的「图鉴编号→精灵名称」写成字典（替换成你的实际数据）
 # 格式：{图鉴编号: "精灵名称", ...}，示例数据需替换成你Excel里的真实内容
@@ -766,7 +763,7 @@ def main():
 if __name__ == "__main__":
     main()
 
-        pass
+
 
 app = Flask(__name__)
 
