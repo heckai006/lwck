@@ -679,7 +679,7 @@ def main():
                 description = boss.get("description", "无描述")
 
                 output = (
-                    f"🐉 精灵名称: {pokemon_name}\n"
+                    f"🐉 v4.0精灵名称: {pokemon_name}\n"
                     f"📍 位置: {location}\n"
                     f"⚔️ 招式: {moves_str}\n"
                     f"📝 描述: {description}\n"
