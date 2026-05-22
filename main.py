@@ -1,23 +1,10 @@
 import requests
 import time
-import logging
 from datetime import datetime, date
-import traceback
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
-# -------------------------- 1. 日志配置（保活关键：记录异常便于排查）--------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler("pokemmo_monitor.log", encoding="utf-8"),  # 日志文件
-        logging.StreamHandler()  # 控制台输出
-    ]
-)
-logger = logging.getLogger(__name__)
-
-# -------------------------- 2. 核心配置（原配置保留）--------------------------
+# -------------------------- 1. 核心配置（关键）--------------------------
+# 直接把Excel里的「图鉴编号→精灵名称」写成字典（替换成你的实际数据）
+# 格式：{图鉴编号: "精灵名称", ...}，示例数据需替换成你Excel里的真实内容
 POKEDEX = {
     1: "妙蛙种子-叶绿素",
     2: "妙蛙草-叶绿素",
@@ -680,169 +667,96 @@ HEADERS = {
 # 去重配置（防止重复推送）
 pushed_today = set()
 today_str = date.today().strftime("%Y-%m-%d")
+# --------------------------------------------------------------------------
 
-# -------------------------- 3. 网络请求重试配置（防网络波动导致失活）--------------------------
-def create_retry_session(retries=3, backoff_factor=0.5):
-    """创建带重试机制的requests会话"""
-    session = requests.Session()
-    retry_strategy = Retry(
-        total=retries,
-        backoff_factor=backoff_factor,  # 重试间隔：0.5s, 1s, 2s...
-        status_forcelist=[429, 500, 502, 503, 504],  # 这些状态码触发重试
-        allowed_methods=["POST", "GET"]  # 允许重试的请求方法
-    )
-    adapter = HTTPAdapter(max_retries=retry_strategy)
-    session.mount("https://", adapter)
-    session.mount("http://", adapter)
-    return session
-
-# 全局会话（复用连接，减少资源消耗）
-session = create_retry_session()
-
-# -------------------------- 4. 核心函数改造（增强异常处理）--------------------------
 def get_boss_data():
-    """调用API获取头目数据（带重试+异常捕获）"""
+    """调用API获取头目数据"""
     try:
-        resp = session.post(
-            API_URL,
-            headers=HEADERS,
-            timeout=15,  # 延长超时时间，防接口响应慢
-            verify=False  # 忽略SSL证书问题（部分环境可能需要）
-        )
+        resp = requests.post(API_URL, headers=HEADERS, timeout=10)
         resp.raise_for_status()
-        data = resp.json()
-        logger.info(f"成功获取头目数据，共{len(data.get('data', []))}条")
-        return data
-    except requests.exceptions.RequestException as e:
-        logger.error(f"API请求失败: {str(e)}")
-        return None
+        return resp.json()
     except Exception as e:
-        logger.error(f"解析API响应失败: {str(e)}\n{traceback.format_exc()}")
+        print(f"[{datetime.now()}] API请求失败: {e}")
         return None
 
 def format_boss_info(boss):
-    """格式化头目信息（增强容错）"""
-    try:
-        # 1. 精灵名称（容错处理）
-        monster_id = boss.get("monster_id", 0)
-        pokedex_num = monster_id // 100 if monster_id else 0
-        pokemon_name = POKEDEX.get(pokedex_num, f"未知精灵(编号{pokedex_num})")
+    """格式化头目信息（编号转名称，只输出目标字段）"""
+    # 1. 精灵名称（用内置字典匹配，无匹配显示“未知精灵”）
+    monster_id = boss.get("monster_id", 0)
+    pokedex_num = monster_id // 100  # API返回的是100倍编号（如12300→123）
+    pokemon_name = POKEDEX.get(pokedex_num, f"未知精灵(编号{pokedex_num})")
 
-        # 2. 核心字段（全量容错）
-        location = boss.get("location_id", "未知位置")
-        moves = [boss.get(f"move{i}") for i in range(1, 5)]
-        moves_str = "、".join([m for m in moves if m]) if any(moves) else "无招式信息"
-        description = boss.get("description", "无描述")
-        
-        # 时间字段容错
-        start_h = str(boss.get("start_hour", "00")).zfill(2)
-        start_m = str(boss.get("start_minute", "00")).zfill(2)
-        end_h = str(boss.get("end_hour", "00")).zfill(2)
-        end_m = str(boss.get("end_minute", "00")).zfill(2)
-        start_time_str = f"{start_h}:{start_m}"
-        end_time_str = f"{end_h}:{end_m}"
-        
-        # 3. 去重标识
-        unique_id = f"{pokemon_name}-{location}"
-        
-        output = (
-            f"🐉 v3.0精灵名称: {pokemon_name}\n"
-            f"📍 位置: {location}\n"
-            f"⚔️ 招式: {moves_str}\n"
-            f"📝 描述: {description}\n"
-            f"⏰ 开始时间: {start_time_str}\n"
-            f"⏱️ 结束时间: {end_time_str}"
-        )
-        return output, unique_id
-    except Exception as e:
-        logger.error(f"格式化头目信息失败: {str(e)}\n{traceback.format_exc()}")
-        return f"信息解析失败: {str(e)}", f"error-{datetime.now().timestamp()}"
+    # 2. 位置、招式、描述（只保留你要的字段）
+    location = boss.get("location_id", "未知位置")
+    moves = [boss.get(f"move{i}") for i in range(1, 5)]  # 提取move1~move4
+    moves_str = "、".join([m for m in moves if m]) if any(moves) else "无招式信息"
+    description = boss.get("description", "无描述")
+  
+    start_h = boss.get("start_hour", "00")
+    start_m = boss.get("start_minute", "00")
+    end_h = boss.get("end_hour", "00")
+    end_m = boss.get("end_minute", "00")
+    start_time_str = f"{start_h}:{start_m}"
+    end_time_str = f"{end_h}:{end_m}"
+    
+    # 3. 去重标识（今天+名称+位置，避免重复推送）
+    unique_id = f"{pokemon_name}-{location}"
+    
+    # 最终输出内容（无编号，直接显示名称）
+    output = (
+        f"🐉 v3.0精灵名称: {pokemon_name}\n"
+        f"📍 位置: {location}\n"
+        f"⚔️ 招式: {moves_str}\n"
+        f"📝 描述: {description}\n"
+        f"⏰ 开始时间: {start_time_str}\n"
+        f"⏱️ 结束时间: {end_time_str}" 
+    )
+    return output, unique_id
 
 def send_miao_notification(msg):
-    """发送喵提醒（带重试+异常捕获）"""
+    """发送喵提醒"""
     try:
-        params = {"id": MIAO_ID, "text": msg}
-        resp = session.get(MIAO_URL, params=params, timeout=10, verify=False)
-        resp.raise_for_status()
-        logger.info("喵提醒推送成功")
+        requests.get(MIAO_URL, params={"id": MIAO_ID, "text": msg}, timeout=5)
+        print(f"[{datetime.now()}] ✅ 喵提醒推送成功")
     except Exception as e:
-        logger.error(f"喵提醒推送失败: {str(e)}\n{traceback.format_exc()}")
+        print(f"[{datetime.now()}] ❌ 喵提醒推送失败: {e}")
 
-def reset_daily_data():
-    """重置每日推送记录（独立函数，增强可读性）"""
-    global pushed_today, today_str
-    current_day = date.today().strftime("%Y-%m-%d")
-    now_hour = datetime.now().hour
-    if current_day != today_str and now_hour >= 2:
-        today_str = current_day
-        pushed_today.clear()
-        logger.info("🔄 凌晨3点，已重置今日推送记录")
-
-# -------------------------- 5. 主循环改造（防卡死+无限保活）--------------------------
 def main():
-    """主循环（增强鲁棒性，永不退出）"""
-    logger.info("=== POKEMMO头目监控脚本启动 ===")
-    logger.info(f"✅ 内置图鉴表加载完成，共{len(POKEDEX)}个精灵")
-    logger.info(f"监控频率: 每分钟1次 | 推送ID: {MIAO_ID}")
-    logger.info("-------------------------------")
-
-    # 防卡死计数器：每运行100次重启一次会话（释放资源）
-    loop_count = 0
-    max_loop_before_reset = 100
-
+    global pushed_today, today_str
+    print(f"=== POKEMMO头目监控脚本启动 ===")
+    print(f"✅ 内置图鉴表加载完成，共{len(POKEDEX)}个精灵")
+    print(f"监控频率: 每分钟1次 | 推送ID: {MIAO_ID}")
+    print("-------------------------------")
+    
     while True:
-        try:
-            # 1. 每日重置
-            reset_daily_data()
+        # 每天凌晨 3 点 才重置推送记录（不是0点！）
+        current_day = date.today().strftime("%Y-%m-%d")
+        now_hour = datetime.now().hour
 
-            # 2. 获取头目数据
-            data = get_boss_data()
-            if not data or "data" not in data:
-                logger.warning("未获取到有效头目数据，60秒后重试")
-                time.sleep(60)
-                continue
+        # 只有【日期变了 + 时间到凌晨3点后】才清空
+        if current_day != today_str and now_hour >= 2:
+            today_str = current_day
+            pushed_today.clear()
+            print(f"[{datetime.now()}] 🔄 凌晨3点，已重置今日推送记录")
 
-            # 3. 处理每个头目
-            for boss in data["data"]:
-                info, unique_id = format_boss_info(boss)
-                logger.info(f"\n发现头目:\n{info}\n")
-                
-                if unique_id not in pushed_today:
-                    send_miao_notification(info)
-                    pushed_today.add(unique_id)
-
-            # 4. 定期重置会话（防止连接泄漏）
-            loop_count += 1
-            if loop_count >= max_loop_before_reset:
-                global session
-                session.close()
-                session = create_retry_session()
-                loop_count = 0
-                logger.info("🔄 已重置网络会话，释放资源")
-
-            # 5. 正常休眠（容错：如果休眠被中断，重新休眠）
-            time.sleep(60)
-
-        # 捕获所有异常，保证主循环不退出
-        except KeyboardInterrupt:
-            logger.info("用户手动终止脚本")
-            session.close()
-            break
-        except Exception as e:
-            logger.error(f"主循环异常（不会退出）: {str(e)}\n{traceback.format_exc()}")
-            # 异常时延长休眠时间，避免高频报错
-            time.sleep(60)
+        # 获取并处理头目数据
+        data = get_boss_data()
+        if not data or "data" not in data:
+            print(f"[{datetime.now()}] 未获取到有效头目数据")
+            time.sleep(60)  # 每分钟1次，等待60秒
             continue
+        
+        # 遍历头目，输出+推送
+        for boss in data["data"]:
+            info, unique_id = format_boss_info(boss)
+            print(f"\n[{datetime.now()}] 发现头目:\n{info}\n")
+            
+            # 未推送过则触发提醒
+            if unique_id not in pushed_today:
+                send_miao_notification(info)
+                pushed_today.add(unique_id)
+        
+        time.sleep(60)
 
-# -------------------------- 6. 进程保活（Windows/Linux通用）--------------------------
 if __name__ == "__main__":
-    # 无限重启机制：如果脚本意外退出，立即重启
-    while True:
-        try:
-            main()
-        except Exception as e:
-            logger.critical(f"脚本崩溃，即将重启: {str(e)}\n{traceback.format_exc()}")
-            time.sleep(10)  # 崩溃后等待10秒重启，避免瞬间重复崩溃
-        else:
-            # 只有手动终止时才退出
-            break
+    main()
