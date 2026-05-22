@@ -633,7 +633,7 @@ today_str = date.today().strftime("%Y-%m-%d")
 
 def main():
     global pushed_today, today_str
-    print("\n🎯 v4.0_POKEMMO 头目监控正式启动（主线程运行）")
+    print("\n🎯 v4.0POKEMMO 头目监控正式启动（主线程运行）")
     print("🔔 每分钟检测一次 | 推送和本地完全一致")
     
     while True:
