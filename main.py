@@ -728,7 +728,7 @@ def send_miao_notification(msg):
 
 def main():
     global pushed_today, today_str
-    print(f"=== POKEMMO头目监控脚本启动 ===")
+    print(f"=== POKEMMO头目监控脚本启动v2.0 ===")
     print(f"✅ 内置图鉴表加载完成，共{len(POKEDEX)}个精灵")
     print(f"监控频率: 每分钟1次 | 推送ID: {MIAO_ID}")
     print("-------------------------------")
