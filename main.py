@@ -1,39 +1,30 @@
-# ======================== 稳定保活模块（绝对不影响你的代码）========================
+# -------------------------- 强制修复Replit端口+保活核心 --------------------------
 import threading
 from flask import Flask
 import time
-
-app = Flask(__name__)
-
-@app.route("/")
-def alive():
-    return "POKEMMO 监控运行中 ✅ 推送正常 | 保活生效"
-
-def start_alive():
-    try:
-        app.run(host="0.0.0.0", port=8080)
-    except:
-        pass
-
-# 后台启动保活，不干扰你的主程序
-threading.Thread(target=start_alive, daemon=True).start()
-time.sleep(1)
-print("=" * 65)
-print("✅ 保活服务已启动 | Replit 永久在线")
-print("✅ 你的代码 100% 正常运行 | 推送不受任何影响")
-print("=" * 65)
-# ======================== 保活结束 ========================
-
-
-
-
-
-# ======================== 你 完 整 原 版 代 码（一条数据都没少！）=========================
 import requests
-import time
 from datetime import datetime, date
 
-# ======================= 你完整的 600+ 精灵图鉴（全的！）=======================
+# 1. Flask保活（强制8080端口，Replit唯一稳定端口）
+app = Flask(__name__)
+@app.route('/')
+def alive():
+    return "✅ POKEMMO监控运行中 | 推送正常 | 保活生效"
+
+def run_flask():
+    # 关闭debug、关闭重载、强制8080端口，杜绝进程冲突
+    app.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
+
+# 2. 后台启动Flask，不抢主线程（监控脚本必须跑在主线程）
+flask_thread = threading.Thread(target=run_flask, daemon=True)
+flask_thread.start()
+time.sleep(2)  # 等Flask启动完，避免冲突
+print("="*70)
+print("✅ 保活服务启动（8080端口）| Replit永不休眠")
+print("✅ 监控脚本即将启动 | 推送功能和本地完全一致")
+print("="*70)
+
+# -------------------------- 你的600+图鉴（完整无删减） --------------------------
 POKEDEX = {
     1: "妙蛙种子-叶绿素",
     2: "妙蛙草-叶绿素",
@@ -628,10 +619,10 @@ POKEDEX = {
     591: "盖诺赛克特-下载"
 }
 
-# 接口配置
+# -------------------------- 你的核心逻辑（和本地一致，不改一行） --------------------------
 API_URL = "https://pokemmo.lanbizi.com/api/alpha/spawn/current"
 MIAO_URL = "http://miaotixing.com/trigger"
-MIAO_ID = "tb1mrXT"
+MIAO_ID = "tb1mrXT"  # 确认这是你自己的喵提醒ID！
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -642,8 +633,8 @@ today_str = date.today().strftime("%Y-%m-%d")
 
 def main():
     global pushed_today, today_str
-    print("🎯 POKEMMO 头目监控已启动")
-    print("🔔 每分钟检测一次 | 推送正常")
+    print("\n🎯 POKEMMO 头目监控正式启动（主线程运行）")
+    print("🔔 每分钟检测一次 | 推送和本地完全一致")
     
     while True:
         try:
@@ -654,7 +645,7 @@ def main():
                 pushed_today.clear()
                 print("\n📅 新日期，已清空推送记录")
 
-            # 请求数据
+            # 请求数据（和本地一模一样的逻辑）
             response = requests.post(API_URL, headers=HEADERS, timeout=10)
             data = response.json()
 
@@ -700,6 +691,7 @@ def main():
                 print(output)
                 print("="*70)
 
+                # 推送逻辑（和本地完全一致）
                 if unique_id not in pushed_today:
                     requests.get(MIAO_URL, params={"id": MIAO_ID, "text": output}, timeout=10)
                     pushed_today.add(unique_id)
@@ -711,5 +703,6 @@ def main():
             print(f"❌ 异常：{str(e)}")
             time.sleep(60)
 
+# -------------------------- 启动主线程（监控脚本） --------------------------
 if __name__ == "__main__":
     main()
