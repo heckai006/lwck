@@ -709,7 +709,7 @@ def monitor_main():
                 et = f"{boss['end_hour']:02d}:{boss['end_minute']:02d}"
                 desc = boss.get("description","无备注")
 
-                msg = f"【头目】{name}\n地点：{loc}\n技能：{move_txt}\n时段：{st}-{et}\n说明：{desc}"
+                msg = f"【v7.0头目】{name}\n地点：{loc}\n技能：{move_txt}\n时段：{st}-{et}\n说明：{desc}"
                 print("-"*50)
                 print(msg)
                 print("-"*50)
